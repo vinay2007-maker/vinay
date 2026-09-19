@@ -8,8 +8,8 @@ def make():
     p=Portfolio(fee_rate=0); r=RiskManager(max_position_size=100); return PaperTrader(p,r),p,r
 
 def test_long_take_profit_and_short_stop():
-    t,p,r=make(); t.execute(r.create_plan(Signal.LONG,p.equity,100,90)); assert t.check_exit(0,120)=='TAKE_PROFIT'; assert p.realized_pnl==pytest.approx(200)
-    t.execute(r.create_plan(Signal.SHORT,p.equity,100,110)); assert t.check_exit(0,110)=='STOP_LOSS'; assert p.realized_pnl==pytest.approx(98)
+    t,p,r=make(); t.execute(r.create_plan(Signal.LONG,p.equity,100,90)); assert t.check_exit(0,120)=='TAKE_PROFIT'; assert p.realized_pnl==pytest.approx(2)
+    t.execute(r.create_plan(Signal.SHORT,p.equity,100,110)); assert t.check_exit(0,110)=='STOP_LOSS'; assert p.realized_pnl==pytest.approx(1)
 
 def test_kill_switch():
     t,p,r=make(); r.kill_switch=True

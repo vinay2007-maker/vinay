@@ -1,6 +1,6 @@
 # Delta AI Trading Bot — paper trading only
 
-Educational prototype. It has no Delta Exchange connection, reads no credentials, and contains no live order execution. The baseline EMA-crossover/RSI strategy is not a profitability claim.
+Educational prototype. It uses only public Delta Exchange market-data endpoints, reads no credentials, and contains no live order execution. The baseline EMA-crossover/RSI strategy is not a profitability claim.
 
 ## Run
 ```bash
@@ -23,10 +23,26 @@ with historical one-minute candles, and listens to the public
 local proposed paper plans. It does not use API keys, authenticated endpoints,
 or any order placement, cancellation, or modification API.
 
+## Historical XAUTUSD backtest
+Download validated public candles, save them locally, and run the existing
+paper backtester:
+```bash
+python -m src.historical_backtest --symbol XAUTUSD \
+	--resolution 1m \
+	--start 2026-01-01T00:00:00Z \
+	--end 2026-01-02T00:00:00Z \
+	--output data/XAUTUSD_1m.csv
+```
+
+The range is bounded by `--max-candles` (10,000 by default), and no alternate
+symbol is selected if Delta rejects the requested symbol. The output is a
+historical paper simulation only; it is not a prediction of future
+profitability.
+
 ## Architecture
 `market_data` validates simulated or CSV OHLCV -> `indicators` calculates features -> `strategy` emits LONG/SHORT/HOLD -> `risk_manager` validates a paper `TradePlan` -> `paper_trader` simulates execution and exits -> `portfolio` records balance, equity, P&L and fees. `backtester.run_backtest` applies this flow candle by candle.
 
-Quantity is measured in base units (BTC/contracts), not currency. Maximum loss before fees is `quantity * abs(entry-stop)`; quantity is capped at 1% of equity risk and `max_position_size`. Fees are simulated on entry and exit.
+Quantity is measured in Delta contract counts, not XAUT units or currency. For XAUTUSD, each contract represents `0.001 XAUT`; notional is `price * quantity * contract_value`. Maximum loss before fees is `quantity * abs(entry-stop) * contract_value`; quantity is capped at 1% of equity risk and `max_position_size`. Fees are simulated on entry and exit.
 
 ## Historical data
 CSV files must contain positive `open,high,low,close,volume` columns. Use `from src.backtester import backtest_csv; print(backtest_csv('data.csv'))`.

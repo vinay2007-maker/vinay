@@ -1,4 +1,4 @@
-"""Paper execution only: no exchange client or order-placement path exists."""
+"""Paper execution only; quantities are Delta contract counts."""
 from .portfolio import Portfolio, Position
 from .risk_manager import RiskManager, TradePlan
 class PaperTrader:

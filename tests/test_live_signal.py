@@ -34,7 +34,7 @@ def test_long_signal_report_is_explicitly_not_executed():
     assert "Stop Loss:       156.50000000" in report
     assert "Take Profit:     168.50000000" in report
     assert "Quantity:        1.00000000" in report
-    assert "Risk Amount:     4.00000000" in report
+    assert "Risk Amount:     0.00400000" in report
     assert "Risk/Reward:     2.00" in report
     assert "STATUS: SIGNAL ONLY — NOT EXECUTED" in report
 
@@ -69,7 +69,7 @@ def test_short_signal_report_contains_proposed_plan_fields():
     assert "Stop Loss:       164.50000000" in report
     assert "Take Profit:     152.50000000" in report
     assert "Quantity:        1.00000000" in report
-    assert "Risk Amount:     4.00000000" in report
+    assert "Risk Amount:     0.00400000" in report
     assert "Risk/Reward:     2.00" in report
 
 
