@@ -68,7 +68,10 @@ def parse_candle_message(message: Any) -> Candle | None:
             candidate = nested
             break
 
-    timestamp = candidate.get("timestamp", candidate.get("time", candidate.get("start")))
+    timestamp = candidate.get(
+        "candle_start_time",
+        candidate.get("timestamp", candidate.get("time", candidate.get("start"))),
+    )
     values = {name: candidate.get(name) for name in ("open", "high", "low", "close", "volume")}
     if timestamp is None or any(value is None for value in values.values()):
         return None

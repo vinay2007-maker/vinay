@@ -34,6 +34,7 @@ def test_parse_candle_message_accepts_public_candle_payload():
 
 def test_delta_candle_timestamp_is_microseconds_and_formats_as_utc():
     timestamp = 1_789_810_759_472_477
+    candle_start_time = 1_789_810_740_000_000
     candle = parse_candle_message({
         "close": 81280.0,
         "high": 81287.0,
@@ -44,13 +45,13 @@ def test_delta_candle_timestamp_is_microseconds_and_formats_as_utc():
         "symbol": "BTCUSD",
         "resolution": "1m",
         "volume": 881.0,
-        "candle_start_time": 1_789_810_740_000_000,
+        "candle_start_time": candle_start_time,
         "last_updated": timestamp,
         "sUID": "BTCUSD_#_BTCUSD_#_1",
     })
 
     assert normalize_timestamp(timestamp) == 1789810759.472477
-    assert candle.timestamp == 1789810759.472477
+    assert candle.timestamp == 1789810740.0
 
 
 def test_parse_candle_message_rejects_malformed_data():
@@ -70,6 +71,95 @@ def test_accumulator_emits_only_completed_candles_and_current_price():
 
     assert completed.close == 102
     assert live_price == 103
+
+
+def test_websocket_updates_same_candle_emit_one_completed_event(monkeypatch):
+    messages = [
+        {"type": "subscriptions"},
+        candle_message(1_700_000_000, 101),
+        candle_message(1_700_000_000, 102),
+        candle_message(1_700_000_060, 103),
+    ]
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"result": [candle_message(1_699_999_940, 100)]}).encode()
+
+    class FakeSocket:
+        def send(self, message):
+            pass
+
+        def recv(self):
+            return json.dumps(messages.pop(0))
+
+        def close(self):
+            pass
+
+    market = DeltaMarketData(
+        opener=lambda request, timeout: FakeResponse(),
+        websocket_factory=lambda url, timeout: FakeSocket(),
+    )
+    monkeypatch.setattr(market, "sleep", lambda delay: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    events = []
+    stream = market.stream_completed_candles()
+    try:
+        while len(events) < 1:
+            events.append(next(stream))
+    finally:
+        stream.close()
+
+    assert len(events) == 1
+    assert events[0][0]["close"].iloc[-1] == 102
+    assert events[0][1] == 103
+
+
+def test_websocket_new_candle_emits_exactly_one_new_event(monkeypatch):
+    messages = [
+        candle_message(1_700_000_000, 101),
+        candle_message(1_700_000_000, 102),
+        candle_message(1_700_000_060, 103),
+        candle_message(1_700_000_060, 104),
+        candle_message(1_700_000_120, 105),
+    ]
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"result": [candle_message(1_699_999_940, 100)]}).encode()
+
+    class FakeSocket:
+        def send(self, message):
+            pass
+
+        def recv(self):
+            return json.dumps(messages.pop(0))
+
+        def close(self):
+            pass
+
+    market = DeltaMarketData(
+        opener=lambda request, timeout: FakeResponse(),
+        websocket_factory=lambda url, timeout: FakeSocket(),
+    )
+    stream = market.stream_completed_candles()
+    events = [next(stream), next(stream)]
+    stream.close()
+
+    assert len(events) == 2
+    assert [event[0]["close"].iloc[-1] for event in events] == [102, 104]
+    assert [event[1] for event in events] == [103, 105]
 
 
 def test_history_loader_uses_public_rest_without_authentication():
