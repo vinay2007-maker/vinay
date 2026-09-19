@@ -54,7 +54,15 @@ def build_signal_report(candles, live_price, settings=None, signal_fn=generate_s
         settings.risk_reward_ratio,
         settings.contract_value,
     )
-    portfolio = Portfolio(settings.initial_balance, settings.fee_rate, settings.contract_value)
+    portfolio = Portfolio(
+        settings.initial_balance,
+        settings.fee_rate,
+        settings.contract_value,
+        settings.maker_fee_rate,
+        settings.taker_fee_rate,
+        settings.entry_fee_type,
+        settings.exit_fee_type,
+    )
     plan = risk.create_plan(signal, portfolio.equity, entry, stop)
     lines.extend([
         f"Proposed Entry: {plan.entry:.8f} (NOT EXECUTED)",

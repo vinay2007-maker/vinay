@@ -9,7 +9,11 @@ class Settings:
     max_daily_loss: float = 0.03
     max_open_positions: int = 2
     max_position_size: float = 1.0  # Maximum number of Delta contracts.
-    fee_rate: float = 0.0005
+    fee_rate: float | None = None  # Legacy override for both sides.
+    maker_fee_rate: float = 0.0001
+    taker_fee_rate: float = 0.0001
+    entry_fee_type: str = "taker"
+    exit_fee_type: str = "taker"
     contract_value: float = 0.001  # Each contract represents 0.001 XAUT.
     atr_multiplier: float = 2.0
     risk_reward_ratio: float = 2.0
@@ -23,7 +27,11 @@ class Settings:
             max_daily_loss=float(os.getenv("MAX_DAILY_LOSS", "0.03")),
             max_open_positions=int(os.getenv("MAX_OPEN_POSITIONS", "2")),
             max_position_size=float(os.getenv("MAX_POSITION_SIZE", "1")),
-            fee_rate=float(os.getenv("PAPER_FEE_RATE", "0.0005")),
+            fee_rate=float(os.environ["PAPER_FEE_RATE"]) if "PAPER_FEE_RATE" in os.environ else None,
+            maker_fee_rate=float(os.getenv("MAKER_FEE_RATE", "0.0001")),
+            taker_fee_rate=float(os.getenv("TAKER_FEE_RATE", "0.0001")),
+            entry_fee_type=os.getenv("ENTRY_FEE_TYPE", "taker"),
+            exit_fee_type=os.getenv("EXIT_FEE_TYPE", "taker"),
             contract_value=float(os.getenv("CONTRACT_VALUE", "0.001")),
             atr_multiplier=float(os.getenv("ATR_MULTIPLIER", "2")),
             risk_reward_ratio=float(os.getenv("RISK_REWARD_RATIO", "2")),

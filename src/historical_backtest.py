@@ -165,6 +165,9 @@ def format_backtest_report(
         "----------------------------------------",
         f"Symbol: {symbol}",
         f"Timeframe: {resolution}",
+        "Fee model:",
+        f"Entry: {result.entry_fee_type.upper()} {result.maker_fee_rate if result.entry_fee_type == 'maker' else result.taker_fee_rate:.4f}",
+        f"Exit: {result.exit_fee_type.upper()} {result.maker_fee_rate if result.exit_fee_type == 'maker' else result.taker_fee_rate:.4f}",
         f"Start: {start}",
         f"End: {end}",
         f"Candles: {len(frame)}",
@@ -241,8 +244,12 @@ def run_historical_backtest(
     result = run_backtest(
         frame,
         initial_balance=settings.initial_balance,
-        fee_rate=settings.fee_rate,
         contract_value=settings.contract_value,
+        fee_rate=settings.fee_rate,
+        maker_fee_rate=settings.maker_fee_rate,
+        taker_fee_rate=settings.taker_fee_rate,
+        entry_fee_type=settings.entry_fee_type,
+        exit_fee_type=settings.exit_fee_type,
     )
     return frame, result, format_backtest_report(result, frame, symbol, resolution, include_trades)
 

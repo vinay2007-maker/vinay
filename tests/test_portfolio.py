@@ -52,3 +52,32 @@ def test_fee_formula_uses_base_unit_notional_for_xautusd_assumption():
     assert p.notional_for(4800, 1) == pytest.approx(4.80)
     assert p.entry_fees == pytest.approx(4377.88 * 1 * .001 * .0005)
     assert p.exit_fees == pytest.approx(4377.88 * 1 * .001 * .0005)
+
+@pytest.mark.parametrize(
+    "entry_type,exit_type,expected_entry,expected_exit",
+    [
+        ("maker", "maker", .00048, .00048),
+        ("maker", "taker", .00048, .0024),
+        ("taker", "maker", .0024, .00048),
+        ("taker", "taker", .0024, .0024),
+    ],
+)
+def test_explicit_entry_and_exit_fee_types(entry_type, exit_type, expected_entry, expected_exit):
+    p = Portfolio(
+        initial_balance=10_000,
+        contract_value=.001,
+        maker_fee_rate=.0001,
+        taker_fee_rate=.0005,
+        entry_fee_type=entry_type,
+        exit_fee_type=exit_type,
+    )
+    p.open_position("LONG", 4800, 1, 4790, 4820)
+    p.close_position(0, 4800)
+
+    assert p.entry_fees == pytest.approx(expected_entry)
+    assert p.exit_fees == pytest.approx(expected_exit)
+    assert p.realized_pnl == pytest.approx(-(expected_entry + expected_exit))
+
+def test_invalid_fee_type_is_rejected():
+    with pytest.raises(ValueError, match="fee type"):
+        Portfolio(entry_fee_type="invalid")

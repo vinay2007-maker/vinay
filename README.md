@@ -44,6 +44,11 @@ profitability.
 
 Quantity is measured in Delta contract counts, not XAUT units or currency. For XAUTUSD, each contract represents `0.001 XAUT`; notional is `price * quantity * contract_value`. Maximum loss before fees is `quantity * abs(entry-stop) * contract_value`; quantity is capped at 1% of equity risk and `max_position_size`. Fees are simulated on entry and exit.
 
+Historical paper backtests use explicit fee settings: `MAKER_FEE_RATE`,
+`TAKER_FEE_RATE`, `ENTRY_FEE_TYPE`, and `EXIT_FEE_TYPE`. The default is
+conservative taker/taker at `0.0001` per side. `PAPER_FEE_RATE` remains an
+explicit legacy override that applies one rate to both sides.
+
 ## Historical data
 CSV files must contain positive `open,high,low,close,volume` columns. Use `from src.backtester import backtest_csv; print(backtest_csv('data.csv'))`.
 

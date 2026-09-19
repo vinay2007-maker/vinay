@@ -42,11 +42,20 @@ class BacktestResult:
     maximum_drawdown: float
     final_balance: float
     trades: list[TradeReport] = field(default_factory=list)
+    maker_fee_rate: float = .0001
+    taker_fee_rate: float = .0001
+    entry_fee_type: str = "taker"
+    exit_fee_type: str = "taker"
 
 
-def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=.0005, contract_value=.001):
+def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=None, contract_value=.001,
+                 maker_fee_rate=.0001, taker_fee_rate=.0001,
+                 entry_fee_type="taker", exit_fee_type="taker"):
     data = validate_ohlcv(frame)
-    portfolio = Portfolio(initial_balance, fee_rate, contract_value)
+    portfolio = Portfolio(
+        initial_balance, fee_rate, contract_value, maker_fee_rate, taker_fee_rate,
+        entry_fee_type, exit_fee_type,
+    )
     risk = RiskManager(contract_value=contract_value)
     trader = PaperTrader(portfolio, risk)
     wins = losses = 0
@@ -133,6 +142,10 @@ def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=.0005, c
         maximum_drawdown=max_dd,
         final_balance=portfolio.balance,
         trades=trades,
+        maker_fee_rate=portfolio.maker_fee_rate,
+        taker_fee_rate=portfolio.taker_fee_rate,
+        entry_fee_type=portfolio.entry_fee_type,
+        exit_fee_type=portfolio.exit_fee_type,
     )
 
 

@@ -157,3 +157,18 @@ def test_trades_option_only_adds_detail_without_changing_backtest_result(monkeyp
     assert default[1] == detailed[1]
     assert "TRADE REPORT" not in default[2]
     assert "TRADE REPORT" in detailed[2]
+
+
+def test_backtest_report_displays_selected_fee_model():
+    frame = historical.parse_historical_rows({"result": [candle_row()]})
+    result = BacktestResult(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10000,
+        entry_fee_type="maker", exit_fee_type="taker",
+        maker_fee_rate=.0001, taker_fee_rate=.0005,
+    )
+
+    report = historical.format_backtest_report(result, frame, "XAUTUSD", "1m")
+
+    assert "Fee model:" in report
+    assert "Entry: MAKER 0.0001" in report
+    assert "Exit: TAKER 0.0005" in report
