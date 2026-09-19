@@ -1,12 +1,15 @@
 """Candle-by-candle paper backtester with explicit P&L accounting."""
 from dataclasses import dataclass, field
 import pandas as pd
-from .indicators import atr
+from .indicators import atr, ema, rsi
 from .market_data import load_ohlcv_csv, validate_ohlcv
 from .portfolio import Portfolio
 from .risk_manager import RiskManager
 from .strategy import Signal, generate_signal
 from .paper_trader import PaperTrader
+
+_DEFAULT_GENERATE_SIGNAL = generate_signal
+_DEFAULT_ATR = atr
 
 
 @dataclass
@@ -50,8 +53,10 @@ class BacktestResult:
 
 def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=None, contract_value=.001,
                  maker_fee_rate=.0001, taker_fee_rate=.0001,
-                 entry_fee_type="taker", exit_fee_type="taker"):
+                 entry_fee_type="taker", exit_fee_type="taker",
+                 precompute_indicators=True):
     data = validate_ohlcv(frame)
+    precomputed = _precompute_indicators(data) if precompute_indicators else None
     portfolio = Portfolio(
         initial_balance, fee_rate, contract_value, maker_fee_rate, taker_fee_rate,
         entry_fee_type, exit_fee_type,
@@ -87,9 +92,15 @@ def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=None, co
                 wins += trade_net > 0
                 losses += trade_net <= 0
 
-        signal = generate_signal(window)
+        if precomputed is not None and generate_signal is _DEFAULT_GENERATE_SIGNAL:
+            signal = _signal_from_precomputed(precomputed, i)
+        else:
+            signal = generate_signal(window)
         if signal != Signal.HOLD and len(portfolio.positions) < risk.max_open_positions:
-            current_atr = atr(window, 14).iloc[-1]
+            if precomputed is not None and atr is _DEFAULT_ATR:
+                current_atr = precomputed["atr"].iloc[i - 1]
+            else:
+                current_atr = atr(window, 14).iloc[-1]
             if pd.notna(current_atr) and current_atr > 0:
                 entry = float(row.open)
                 stop = entry - 2 * current_atr if signal == Signal.LONG else entry + 2 * current_atr
@@ -168,6 +179,36 @@ def _trade_report(number, position, entry_time, exit_time, exit_price, reason,
         net_pnl=net_pnl,
         exit_reason=reason,
     )
+
+
+def _precompute_indicators(data):
+    close = data["close"]
+    return {
+        "fast": ema(close, 20),
+        "slow": ema(close, 50),
+        "momentum": rsi(close, 14),
+        "atr": atr(data, 14),
+    }
+
+
+def _signal_from_precomputed(features, candle_index):
+    latest_index = candle_index - 1
+    previous_index = candle_index - 2
+    values = (
+        features["fast"].iloc[previous_index],
+        features["fast"].iloc[latest_index],
+        features["slow"].iloc[previous_index],
+        features["slow"].iloc[latest_index],
+        features["momentum"].iloc[latest_index],
+    )
+    if any(pd.isna(value) for value in values):
+        return Signal.HOLD
+    fast_previous, fast_latest, slow_previous, slow_latest, momentum_latest = values
+    if fast_previous <= slow_previous and fast_latest > slow_latest and momentum_latest >= 50:
+        return Signal.LONG
+    if fast_previous >= slow_previous and fast_latest < slow_latest and momentum_latest <= 50:
+        return Signal.SHORT
+    return Signal.HOLD
 
 
 def backtest_csv(path):

@@ -172,3 +172,33 @@ def test_backtest_report_displays_selected_fee_model():
     assert "Fee model:" in report
     assert "Entry: MAKER 0.0001" in report
     assert "Exit: TAKER 0.0005" in report
+
+
+def test_independent_day_evaluation_preserves_missing_day_and_aggregates(monkeypatch):
+    rows = [candle_row(1_700_000_000 + index * 60, 100 + index) for index in range(60)]
+    frame = historical.parse_historical_rows({"result": rows})
+    result = BacktestResult(1, 1, 0, 1.0, .01, .001, .001, .002, .008, .5, 10000.008)
+
+    def fake_download(symbol, start, end, resolution, max_candles, opener):
+        if start == historical.parse_period("2026-04-15T00:00:00Z"):
+            raise historical.HistoricalDataError("Delta returned no valid historical candles")
+        return frame
+
+    monkeypatch.setattr(historical, "download_historical_candles", fake_download)
+    monkeypatch.setattr(historical, "run_backtest", lambda *args, **kwargs: result)
+
+    reports = historical.evaluate_independent_days("XAUTUSD", ["2026-04-15", "2026-04-18"])
+    output = historical.format_multi_day_report(reports, "XAUTUSD", "1m")
+
+    assert reports[0]["result"] is None
+    assert reports[1]["result"] is result
+    assert "2026-04-15 | 0 | unavailable" in output
+    assert "2026-04-18 | 60 | 1 | 1 | 0" in output
+    assert "Days with data: 1" in output
+    assert "Net P&L: 0.00800000" in output
+
+
+def test_daily_window_is_below_existing_candle_limit():
+    start, end = historical.daily_period("2026-04-18")
+
+    historical.validate_request_range(start, end, "1m", historical.DEFAULT_MAX_CANDLES)

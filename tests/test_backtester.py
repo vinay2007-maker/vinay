@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+import math
 import src.backtester as backtester
 from src.strategy import Signal
 
@@ -111,3 +112,19 @@ def test_overlapping_trade_reports_are_appended_in_close_order(monkeypatch):
     result = backtester.run_backtest(data, initial_balance=10_000, fee_rate=0)
 
     assert [trade.entry_time for trade in result.trades] == [1120, 1060]
+
+def test_precomputed_indicators_match_expanding_window_reference():
+    close_prices = [100 + 4 * math.sin(index / 9) + index / 80 for index in range(240)]
+    data = pd.DataFrame({
+        "timestamp": list(range(1_700_000_000, 1_700_000_000 + 240 * 60, 60)),
+        "open": close_prices,
+        "high": [price + .5 for price in close_prices],
+        "low": [price - .5 for price in close_prices],
+        "close": close_prices,
+        "volume": [1.0] * len(close_prices),
+    })
+
+    optimized = backtester.run_backtest(data)
+    reference = backtester.run_backtest(data, precompute_indicators=False)
+
+    assert optimized == reference

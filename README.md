@@ -34,6 +34,16 @@ python -m src.historical_backtest --symbol XAUTUSD \
 	--output data/XAUTUSD_1m.csv
 ```
 
+Evaluate independent UTC days with the same unchanged paper backtester:
+```bash
+python -m src.historical_backtest --symbol XAUTUSD \
+	--resolution 1m \
+	--days 2026-04-15,2026-04-16,2026-04-17,2026-04-18
+```
+
+Each day is requested as a separate 24-hour window. Days before the public
+XAUTUSD launch may report no data; no alternate symbol is substituted.
+
 The range is bounded by `--max-candles` (10,000 by default), and no alternate
 symbol is selected if Delta rejects the requested symbol. The output is a
 historical paper simulation only; it is not a prediction of future

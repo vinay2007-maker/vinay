@@ -35,6 +35,11 @@ class HistoricalDataError(RuntimeError):
     """Raised when public historical data cannot be downloaded or validated."""
 
 
+def daily_period(day: str) -> tuple[int, int]:
+    start = parse_period(f"{day}T00:00:00Z")
+    return start, start + 86400
+
+
 def parse_period(value: str | int | float) -> int:
     if isinstance(value, (int, float)):
         timestamp = int(value)
@@ -118,7 +123,13 @@ def download_historical_candles(
         "start": start_timestamp,
         "end": end_timestamp,
     })
-    request = Request(f"{REST_CANDLES_URL}?{query}", headers={"Accept": "application/json"})
+    request = Request(
+        f"{REST_CANDLES_URL}?{query}",
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "XAUTUSD-paper-backtester/1.0",
+        },
+    )
     try:
         with opener(request, timeout=timeout) as response:
             payload = _response_payload(response)
@@ -254,17 +265,110 @@ def run_historical_backtest(
     return frame, result, format_backtest_report(result, frame, symbol, resolution, include_trades)
 
 
+def evaluate_independent_days(
+    symbol: str,
+    days: list[str],
+    resolution: str = "1m",
+    max_candles: int = DEFAULT_MAX_CANDLES,
+    opener: Callable[..., Any] = urlopen,
+) -> list[dict[str, Any]]:
+    """Run separate paper backtests for bounded UTC calendar-day windows."""
+    settings = Settings.from_env()
+    reports = []
+    for day in days:
+        start, end = daily_period(day)
+        try:
+            frame = download_historical_candles(
+                symbol, start, end, resolution, max_candles, opener,
+            )
+        except HistoricalDataError as error:
+            reports.append({"day": day, "frame": None, "result": None, "error": str(error)})
+            continue
+        result = run_backtest(
+            frame,
+            initial_balance=settings.initial_balance,
+            contract_value=settings.contract_value,
+            fee_rate=settings.fee_rate,
+            maker_fee_rate=settings.maker_fee_rate,
+            taker_fee_rate=settings.taker_fee_rate,
+            entry_fee_type=settings.entry_fee_type,
+            exit_fee_type=settings.exit_fee_type,
+        )
+        reports.append({"day": day, "frame": frame, "result": result, "error": None})
+    return reports
+
+
+def format_multi_day_report(reports: list[dict[str, Any]], symbol: str, resolution: str) -> str:
+    available = [report for report in reports if report["result"] is not None]
+    lines = [
+        "DELTA MULTI-DAY HISTORICAL PAPER BACKTEST",
+        "SIGNAL/PAPER SIMULATION ONLY — NO ORDERS",
+        "Independent UTC calendar-day windows",
+        "----------------------------------------",
+        f"Symbol: {symbol}",
+        f"Timeframe: {resolution}",
+        f"Fee model: {available[0]['result'].entry_fee_type.upper()} / {available[0]['result'].exit_fee_type.upper()}"
+        if available else "Fee model: unavailable",
+        "",
+        "DAY | CANDLES | TRADES | WINS | LOSSES | WIN RATE | GROSS P&L | FEES | NET P&L | MAX DRAWDOWN",
+    ]
+    for report in reports:
+        if report["result"] is None:
+            lines.append(f"{report['day']} | 0 | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable ({report['error']})")
+            continue
+        frame = report["frame"]
+        result = report["result"]
+        lines.append(
+            f"{report['day']} | {len(frame)} | {result.total_trades} | {result.winning_trades} | "
+            f"{result.losing_trades} | {result.win_rate:.4f} | {result.gross_pnl:.8f} | "
+            f"{result.total_fees:.8f} | {result.net_pnl:.8f} | {result.maximum_drawdown:.8f}"
+        )
+    total_trades = sum(report["result"].total_trades for report in available)
+    wins = sum(report["result"].winning_trades for report in available)
+    losses = sum(report["result"].losing_trades for report in available)
+    gross = sum(report["result"].gross_pnl for report in available)
+    fees = sum(report["result"].total_fees for report in available)
+    net = sum(report["result"].net_pnl for report in available)
+    max_drawdown = max((report["result"].maximum_drawdown for report in available), default=0.0)
+    lines.extend([
+        "",
+        "AGGREGATE AVAILABLE-DAY RESULTS",
+        f"Days requested: {len(reports)}",
+        f"Days with data: {len(available)}",
+        f"Trades: {total_trades}",
+        f"Wins: {wins}",
+        f"Losses: {losses}",
+        f"Win rate: {wins / total_trades:.4f}" if total_trades else "Win rate: 0.0000",
+        f"Gross P&L: {gross:.8f}",
+        f"Fees: {fees:.8f}",
+        f"Net P&L: {net:.8f}",
+        f"Maximum daily drawdown: {max_drawdown:.8f}",
+        "Aggregate values combine independent daily runs; drawdown is not a continuous cross-day equity curve.",
+        "Past backtest results do not predict future profitability.",
+    ])
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     settings = Settings.from_env()
     parser = argparse.ArgumentParser(description="Download public XAUTUSD candles and run a paper backtest.")
     parser.add_argument("--symbol", default=settings.symbol)
     parser.add_argument("--resolution", default="1m", choices=sorted(RESOLUTION_SECONDS))
-    parser.add_argument("--start", required=True, help="UTC ISO-8601 or Unix timestamp")
-    parser.add_argument("--end", required=True, help="UTC ISO-8601 or Unix timestamp")
+    parser.add_argument("--start", help="UTC ISO-8601 or Unix timestamp")
+    parser.add_argument("--end", help="UTC ISO-8601 or Unix timestamp")
     parser.add_argument("--output", type=Path, default=Path("data") / "XAUTUSD_1m.csv")
     parser.add_argument("--max-candles", type=int, default=DEFAULT_MAX_CANDLES)
     parser.add_argument("--trades", action="store_true", help="Print the detailed trade report")
+    parser.add_argument("--days", help="Comma-separated UTC dates for independent daily evaluation")
     args = parser.parse_args(argv)
+
+    if args.days:
+        days = [day.strip() for day in args.days.split(",") if day.strip()]
+        print(format_multi_day_report(evaluate_independent_days(args.symbol, days, args.resolution, args.max_candles), args.symbol, args.resolution))
+        return 0
+
+    if not args.start or not args.end:
+        parser.error("--start and --end are required unless --days is provided")
 
     frame, result, report = run_historical_backtest(
         args.symbol, args.start, args.end, args.resolution, args.output, args.max_candles,
