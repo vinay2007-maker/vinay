@@ -12,7 +12,7 @@ class Settings:
     fee_rate: float = 0.0005
     atr_multiplier: float = 2.0
     risk_reward_ratio: float = 2.0
-    symbol: str = "BTCUSD"
+    symbol: str = "XAUTUSD"
 
     @classmethod
     def from_env(cls):
@@ -25,5 +25,5 @@ class Settings:
             fee_rate=float(os.getenv("PAPER_FEE_RATE", "0.0005")),
             atr_multiplier=float(os.getenv("ATR_MULTIPLIER", "2")),
             risk_reward_ratio=float(os.getenv("RISK_REWARD_RATIO", "2")),
-            symbol=os.getenv("PAPER_SYMBOL", "BTCUSD"),
+            symbol=os.getenv("PAPER_SYMBOL", "XAUTUSD"),
         )

@@ -27,11 +27,12 @@ def build_signal_report(candles, live_price, settings=None, signal_fn=generate_s
         "NO ORDERS WILL BE SENT",
         "----------------------------------------",
         f"Symbol: {settings.symbol}",
-        f"Time: {timestamp}",
+        f"Completed candle: {timestamp}",
         f"Live price: {float(live_price):.8f}",
         f"Signal: {signal.value}",
     ]
     if signal == Signal.HOLD:
+        lines.append("Waiting for confirmed setup...")
         lines.append("----------------------------------------")
         return "\n".join(lines)
 
@@ -55,10 +56,12 @@ def build_signal_report(candles, live_price, settings=None, signal_fn=generate_s
     portfolio = Portfolio(settings.initial_balance, settings.fee_rate)
     plan = risk.create_plan(signal, portfolio.equity, entry, stop)
     lines.extend([
-        f"PROPOSED ENTRY — NOT EXECUTED: {plan.entry:.8f}",
-        f"STOP LOSS:       {plan.stop_loss:.8f}",
-        f"TAKE PROFIT:     {plan.take_profit:.8f}",
-        f"QUANTITY:        {plan.quantity:.8f}",
+        f"Proposed Entry: {plan.entry:.8f} (NOT EXECUTED)",
+        f"Stop Loss:       {plan.stop_loss:.8f}",
+        f"Take Profit:     {plan.take_profit:.8f}",
+        f"Quantity:        {plan.quantity:.8f}",
+        f"Risk Amount:     {plan.risk_amount:.8f}",
+        f"Risk/Reward:     {settings.risk_reward_ratio:.2f}",
         "STATUS: SIGNAL ONLY — NOT EXECUTED",
         "----------------------------------------",
     ])
