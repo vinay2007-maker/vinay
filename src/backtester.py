@@ -35,7 +35,7 @@ def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=.0005):
 
     for i in range(1, len(data)):
         row = data.iloc[i]
-        window = data.iloc[:i + 1]
+        window = data.iloc[:i]
         for index in range(len(portfolio.positions) - 1, -1, -1):
             before = portfolio.realized_pnl
             trader.check_exit(index, float(row.close))
@@ -48,7 +48,7 @@ def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=.0005):
         if signal != Signal.HOLD and len(portfolio.positions) < risk.max_open_positions:
             current_atr = atr(window, 14).iloc[-1]
             if pd.notna(current_atr) and current_atr > 0:
-                entry = float(row.close)
+                entry = float(row.open)
                 stop = entry - 2 * current_atr if signal == Signal.LONG else entry + 2 * current_atr
                 try:
                     plan = risk.create_plan(signal, portfolio.equity, entry, stop,
@@ -57,8 +57,10 @@ def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=.0005):
                 except ValueError:
                     pass
 
-        peak = max(peak, portfolio.equity)
-        max_dd = max(max_dd, peak - portfolio.equity)
+        marked_prices = {index: float(row.close) for index in range(len(portfolio.positions))}
+        equity = portfolio.equity_at(marked_prices)
+        peak = max(peak, equity)
+        max_dd = max(max_dd, peak - equity)
 
     # Close remaining positions at the final close so results are fully realized.
     for index in range(len(portfolio.positions) - 1, -1, -1):
@@ -67,6 +69,10 @@ def run_backtest(frame: pd.DataFrame, initial_balance=10000.0, fee_rate=.0005):
         trade_net = portfolio.realized_pnl - before
         wins += trade_net > 0
         losses += trade_net <= 0
+
+    equity = portfolio.equity
+    peak = max(peak, equity)
+    max_dd = max(max_dd, peak - equity)
 
     total = wins + losses
     return BacktestResult(

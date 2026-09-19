@@ -12,6 +12,17 @@ python -m src.main
 pytest -q
 ```
 
+## Live market-data signals
+```bash
+python -m src.live_signal
+```
+
+This connects only to Delta Exchange public market-data endpoints, warms up
+with historical one-minute candles, and listens to the public
+`candlestick_1m` WebSocket channel. It prints completed-candle signals and
+local proposed paper plans. It does not use API keys, authenticated endpoints,
+or any order placement, cancellation, or modification API.
+
 ## Architecture
 `market_data` validates simulated or CSV OHLCV -> `indicators` calculates features -> `strategy` emits LONG/SHORT/HOLD -> `risk_manager` validates a paper `TradePlan` -> `paper_trader` simulates execution and exits -> `portfolio` records balance, equity, P&L and fees. `backtester.run_backtest` applies this flow candle by candle.
 

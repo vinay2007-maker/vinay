@@ -25,6 +25,21 @@ def test_unrealized_and_equity_positive_and_negative():
     p = Portfolio(fee_rate=0)
     p.open_position('LONG', 100, 2, 90, 120)
     assert p.unrealized_pnl({0: 105}) == pytest.approx(10)
-    assert p.equity == pytest.approx(10010)
+    assert p.equity == pytest.approx(10000)
     assert p.unrealized_pnl({0: 95}) == pytest.approx(-10)
-    assert p.equity == pytest.approx(9990)
+    assert p.equity == pytest.approx(10000)
+
+def test_marked_equity_includes_unrealized_pnl():
+    p = Portfolio(fee_rate=0)
+    p.open_position('LONG', 100, 2, 90, 120)
+
+    assert p.equity_at({0: 105}) == pytest.approx(10010)
+    assert p.equity_at({0: 95}) == pytest.approx(9990)
+
+def test_final_balance_reconciles_to_net_realized_pnl():
+    p = Portfolio(1000, .001)
+    p.open_position('LONG', 100, 2, 90, 120)
+    p.close_position(0, 110)
+
+    assert p.realized_pnl == pytest.approx(p.gross_realized_pnl - p.fees)
+    assert p.balance == pytest.approx(p.initial_balance + p.realized_pnl)

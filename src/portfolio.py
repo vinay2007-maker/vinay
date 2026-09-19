@@ -65,4 +65,7 @@ class Portfolio:
 
     @property
     def equity(self):
-        return self.balance + self.unrealized_pnl()
+        return self.equity_at()
+
+    def equity_at(self, prices=None):
+        return self.balance + self.unrealized_pnl(prices)

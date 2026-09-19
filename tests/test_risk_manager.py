@@ -16,3 +16,8 @@ def test_limits_and_invalid_plan():
     with pytest.raises(ValueError): r.create_plan(Signal.LONG, 10000, 100, 90, daily_loss=300)
     with pytest.raises(ValueError): r.create_plan(Signal.LONG, 10000, 100, 90, open_positions=2)
     with pytest.raises(ValueError): r.create_plan(Signal.LONG, 10000, 100, 90, take_profit=105)
+
+def test_short_plan_requires_stop_above_entry_and_target_below_entry():
+    r = RiskManager()
+    with pytest.raises(ValueError): r.create_plan(Signal.SHORT, 10000, 100, 90)
+    with pytest.raises(ValueError): r.create_plan(Signal.SHORT, 10000, 100, 110, take_profit=105)
